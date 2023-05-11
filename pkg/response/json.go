@@ -9,7 +9,7 @@ import (
 
 var EmptyJSONBody = struct{}{}
 
-func JSON(w http.ResponseWriter, httpStatusCode int, jsonData interface{}) {
+func JSON(w http.ResponseWriter, httpStatusCode int, jsonData any) {
 	AddCORSHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatusCode)
