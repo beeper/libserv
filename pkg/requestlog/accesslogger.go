@@ -71,6 +71,11 @@ func AccessLogger(logOptions bool) func(http.Handler) http.Handler {
 				logRequestMaybeJSON(requestLog, "response_body", crw.ResponseBody.Bytes())
 			}
 
+			// don't log successful health requests
+			if r.URL.Path == "/health" && crw.StatusCode == http.StatusNoContent {
+				return
+			}
+
 			requestLog.Msg("Access")
 		})
 	}
