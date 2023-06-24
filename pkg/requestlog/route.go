@@ -15,6 +15,8 @@ type Route struct {
 	TrackHTTPResponseTime func(string) func(int)
 	MetricsEndpoint       string
 
+	TrackHTTPMetrics func(*Route) func(int)
+
 	LogContent bool
 }
 
@@ -22,8 +24,12 @@ var _ http.Handler = (*Route)(nil)
 
 func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	crw := w.(*CountingResponseWriter)
+	// TODO: replace TrackHTTPResponseTime w/TrackHTTPMetrics
 	if rt.TrackHTTPResponseTime != nil {
 		defer rt.TrackHTTPResponseTime(rt.MetricsEndpoint)(crw.StatusCode)
+	}
+	if rt.TrackHTTPMetrics != nil {
+		defer rt.TrackHTTPMetrics(rt)(crw.StatusCode)
 	}
 	if rt.LogContent {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
