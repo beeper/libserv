@@ -12,6 +12,8 @@ type Route struct {
 	Method  string
 	Handler http.HandlerFunc
 
+	// Deprecated: both TrackHTTPResponseTime and MetricsEndpoint are replaced
+	// by the TrackHTTPMetrics function which offers increased flexibility.
 	TrackHTTPResponseTime func(string) func(int)
 	MetricsEndpoint       string
 
@@ -24,7 +26,6 @@ var _ http.Handler = (*Route)(nil)
 
 func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	crw := w.(*CountingResponseWriter)
-	// TODO: replace TrackHTTPResponseTime w/TrackHTTPMetrics
 	if rt.TrackHTTPResponseTime != nil {
 		defer rt.TrackHTTPResponseTime(rt.MetricsEndpoint)(crw.StatusCode)
 	}
