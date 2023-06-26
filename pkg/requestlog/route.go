@@ -12,10 +12,12 @@ type Route struct {
 	Method  string
 	Handler http.HandlerFunc
 
-	// Deprecated: both TrackHTTPResponseTime and MetricsEndpoint are replaced
-	// by the TrackHTTPMetrics function which offers increased flexibility.
+	// Deprecated: TrackHTTPResponseTime has been replaced by the
+	// TrackHTTPMetrics function which offers increased flexibility.
 	TrackHTTPResponseTime func(string) func(int)
-	MetricsEndpoint       string
+	// Deprecated: MetricsEndpoint has been replaced by the TrackHTTPMetrics
+	// function which offers increased flexibility.
+	MetricsEndpoint string
 
 	TrackHTTPMetrics func(*Route) func(int)
 
