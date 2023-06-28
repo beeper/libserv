@@ -28,12 +28,6 @@ var _ http.Handler = (*Route)(nil)
 
 func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	crw := w.(*CountingResponseWriter)
-	if rt.TrackHTTPResponseTime != nil {
-		defer rt.TrackHTTPResponseTime(rt.MetricsEndpoint)(crw.StatusCode)
-	}
-	if rt.TrackHTTPMetrics != nil {
-		defer rt.TrackHTTPMetrics(rt)(crw.StatusCode)
-	}
 	if rt.LogContent {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			crw.ResponseBody = &bytes.Buffer{}
@@ -45,6 +39,12 @@ func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	rt.Handler(w, r)
+	if rt.TrackHTTPResponseTime != nil {
+		rt.TrackHTTPResponseTime(rt.MetricsEndpoint)(crw.StatusCode)
+	}
+	if rt.TrackHTTPMetrics != nil {
+		rt.TrackHTTPMetrics(rt)(crw.StatusCode)
+	}
 }
 
 type partialCachingReader struct {
