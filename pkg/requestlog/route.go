@@ -12,14 +12,7 @@ type Route struct {
 	Method  string
 	Handler http.HandlerFunc
 
-	// Deprecated: TrackHTTPResponseTime has been replaced by the
-	// TrackHTTPMetrics function which offers increased flexibility.
-	TrackHTTPResponseTime func(string) func(int)
-	// Deprecated: MetricsEndpoint has been replaced by the TrackHTTPMetrics
-	// function which offers increased flexibility.
-	MetricsEndpoint string
-
-	TrackHTTPMetrics func(*Route) func(int)
+	TrackHTTPMetrics func(*Route) func(*CountingResponseWriter)
 
 	LogContent bool
 }
@@ -28,6 +21,9 @@ var _ http.Handler = (*Route)(nil)
 
 func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	crw := w.(*CountingResponseWriter)
+	if rt.TrackHTTPMetrics != nil {
+		defer rt.TrackHTTPMetrics(rt)(crw)
+	}
 	if rt.LogContent {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			crw.ResponseBody = &bytes.Buffer{}
@@ -39,12 +35,6 @@ func (rt *Route) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	rt.Handler(w, r)
-	if rt.TrackHTTPResponseTime != nil {
-		rt.TrackHTTPResponseTime(rt.MetricsEndpoint)(crw.StatusCode)
-	}
-	if rt.TrackHTTPMetrics != nil {
-		rt.TrackHTTPMetrics(rt)(crw.StatusCode)
-	}
 }
 
 type partialCachingReader struct {
