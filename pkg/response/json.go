@@ -15,7 +15,7 @@ func JSON(w http.ResponseWriter, httpStatusCode int, jsonData any) {
 	w.WriteHeader(httpStatusCode)
 
 	if err := json.NewEncoder(w).Encode(jsonData); err != nil {
-		log.Err(err).Msgf("Failed to marshal output JSON from %T", jsonData)
+		log.Err(err).Type("json_data_type", jsonData).Msg("Failed to marshal output JSON")
 	}
 }
 

@@ -51,7 +51,10 @@ func (rt *IAMAuthRoundTripper) RoundTrip(req *http.Request) (r *http.Response, e
 	// token renewal
 	if rt.token.Token == "" || time.Now().Add(4*time.Minute).After(rt.token.Expiration) {
 		log := log.Ctx(req.Context())
-		log.Info().Msgf("Renewing STS token for cluster %s, old one expires at %s", rt.clusterID, rt.token.Expiration.String())
+		log.Info().
+			Str("cluster_id", rt.clusterID).
+			Time("token_expiration", rt.token.Expiration).
+			Msg("Renewing STS token for cluster, because the old one is expiring soon")
 
 		rt.token, err = rt.generator.GetWithSTS(rt.clusterID, rt.stsAPI)
 		if err != nil {
@@ -59,7 +62,11 @@ func (rt *IAMAuthRoundTripper) RoundTrip(req *http.Request) (r *http.Response, e
 			return
 		}
 
-		log.Info().Msgf("New STS token for cluster %s expires at %s (in %s)", rt.clusterID, rt.token.Expiration.String(), time.Until(rt.token.Expiration).String())
+		log.Info().
+			Str("cluster_id", rt.clusterID).
+			Time("token_expiration", rt.token.Expiration).
+			Dur("token_validity", time.Until(rt.token.Expiration)).
+			Msg("Got new STS token for cluster")
 	}
 
 	req.Header.Set("Authorization", "Bearer "+rt.token.Token)
