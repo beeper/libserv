@@ -3,7 +3,7 @@ module github.com/beeper/libserv
 go 1.20
 
 require (
-	github.com/aws/aws-sdk-go v1.49.9
+	github.com/aws/aws-sdk-go v1.50.0
 	github.com/rs/zerolog v1.29.1
 	sigs.k8s.io/aws-iam-authenticator v0.6.16
 )
