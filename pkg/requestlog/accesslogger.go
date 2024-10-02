@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,58 +26,89 @@ func AccessLogger(logOptions bool) func(http.Handler) http.Handler {
 			}
 
 			start := time.Now()
-			next.ServeHTTP(crw, r)
-			requestDuration := time.Since(start)
+			defer func() {
+				requestDuration := time.Since(start)
 
-			if r.Method == http.MethodOptions && !logOptions {
-				return
-			}
-
-			var requestLog *zerolog.Event
-			if crw.StatusCode >= 500 {
-				requestLog = log.Error()
-			} else if crw.StatusCode >= 400 {
-				requestLog = log.Warn()
-			} else {
-				requestLog = log.Info()
-			}
-
-			if userAgent := r.UserAgent(); userAgent != "" {
-				requestLog.Str("user_agent", userAgent)
-			}
-			if referer := r.Referer(); referer != "" {
-				requestLog.Str("referer", referer)
-			}
-			remoteAddr := r.RemoteAddr
-
-			requestLog.Str("remote_addr", remoteAddr)
-			requestLog.Str("method", r.Method)
-			requestLog.Str("proto", r.Proto)
-			requestLog.Int64("request_length", r.ContentLength)
-			requestLog.Str("host", r.Host)
-			requestLog.Str("request_uri", r.RequestURI)
-			if r.Method != http.MethodGet && r.Method != http.MethodHead {
-				requestLog.Str("request_content_type", r.Header.Get("Content-Type"))
-				if crw.RequestBody != nil {
-					logRequestMaybeJSON(requestLog, "request_body", crw.RequestBody.Bytes())
+				var requestLog *zerolog.Event
+				if crw.StatusCode >= 500 {
+					requestLog = log.Error()
+				} else if crw.StatusCode >= 400 {
+					requestLog = log.Warn()
+				} else {
+					requestLog = log.Info()
 				}
-			}
 
-			// response
-			requestLog.Int64("request_time_ms", requestDuration.Milliseconds())
-			requestLog.Int("status_code", crw.StatusCode)
-			requestLog.Int("response_length", crw.ResponseLength)
-			requestLog.Str("response_content_type", crw.Header().Get("Content-Type"))
-			if crw.ResponseBody != nil {
-				logRequestMaybeJSON(requestLog, "response_body", crw.ResponseBody.Bytes())
-			}
+				// recover and log the error
+				if rcvr := recover(); rcvr != nil && rcvr != http.ErrAbortHandler {
+					crw.StatusCode = http.StatusInternalServerError
+					w.Header().Set("Content-Type", "text/plain")
+					w.WriteHeader(crw.StatusCode)
 
-			// don't log successful health requests
-			if r.URL.Path == "/health" && crw.StatusCode == http.StatusNoContent {
-				return
-			}
+					resp := struct {
+						Errcode   string `json:"errcode"`
+						Error     string `json:"error"`
+						RequestID string `json:"request_id"`
+						Time      string `json:"time"`
+					}{
+						Errcode: "COM.BEEPER.PANIC",
+						Error:   "Internal Server Error",
+						Time:    time.Now().UTC().Format(time.RFC3339),
+					}
 
-			requestLog.Msg("Access")
+					if requestID, ok := hlog.IDFromRequest(r); ok {
+						resp.RequestID = requestID.String()
+					}
+
+					json.NewEncoder(w).Encode(&resp)
+
+					requestLog = log.Error()
+					requestLog.Interface("panic", rcvr)
+					requestLog.Bytes("stack", debug.Stack())
+				}
+
+				if r.Method == http.MethodOptions && !logOptions {
+					return
+				}
+
+				if userAgent := r.UserAgent(); userAgent != "" {
+					requestLog.Str("user_agent", userAgent)
+				}
+				if referer := r.Referer(); referer != "" {
+					requestLog.Str("referer", referer)
+				}
+				remoteAddr := r.RemoteAddr
+
+				requestLog.Str("remote_addr", remoteAddr)
+				requestLog.Str("method", r.Method)
+				requestLog.Str("proto", r.Proto)
+				requestLog.Int64("request_length", r.ContentLength)
+				requestLog.Str("host", r.Host)
+				requestLog.Str("request_uri", r.RequestURI)
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					requestLog.Str("request_content_type", r.Header.Get("Content-Type"))
+					if crw.RequestBody != nil {
+						logRequestMaybeJSON(requestLog, "request_body", crw.RequestBody.Bytes())
+					}
+				}
+
+				// response
+				requestLog.Int64("request_time_ms", requestDuration.Milliseconds())
+				requestLog.Int("status_code", crw.StatusCode)
+				requestLog.Int("response_length", crw.ResponseLength)
+				requestLog.Str("response_content_type", crw.Header().Get("Content-Type"))
+				if crw.ResponseBody != nil {
+					logRequestMaybeJSON(requestLog, "response_body", crw.ResponseBody.Bytes())
+				}
+
+				// don't log successful health requests
+				if r.URL.Path == "/health" && crw.StatusCode == http.StatusNoContent {
+					return
+				}
+
+				requestLog.Msg("Access")
+			}()
+
+			next.ServeHTTP(crw, r)
 		})
 	}
 }
