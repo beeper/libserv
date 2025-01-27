@@ -3,7 +3,7 @@ module github.com/beeper/libserv
 go 1.21
 
 require (
-	github.com/aws/aws-sdk-go v1.49.9
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/rs/zerolog v1.33.0
 	github.com/tidwall/gjson v1.14.2
 	github.com/tidwall/sjson v1.2.5
