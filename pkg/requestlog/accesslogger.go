@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"runtime/debug"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 const MaxRequestSizeLog = 4 * 1024
@@ -113,15 +116,25 @@ func AccessLogger(logOptions bool) func(http.Handler) http.Handler {
 	}
 }
 
+var hackyPasswordRegex = regexp.MustCompile(`"password":"[^"]+(?:"|$)`)
+var hackyPasswordReplacement = []byte(`"password":"<redacted>"`)
+
 func logRequestMaybeJSON(evt *zerolog.Event, key string, data []byte) {
 	data = removeNewlines(data)
 	if json.Valid(data) {
+		if gjson.GetBytes(data, "auth.password").Exists() {
+			newData, _ := sjson.SetBytesOptions(data, "auth.password", "<redacted>", &sjson.Options{Optimistic: true})
+			if newData != nil {
+				data = newData
+			}
+		}
 		evt.RawJSON(key, data)
 	} else {
 		// Logging as a string will create lots of escaping and it's not valid json anyway, so cut off a bit more
 		if len(data) > MaxStringRequestSizeLog {
 			data = data[:MaxStringRequestSizeLog]
 		}
+		data = hackyPasswordRegex.ReplaceAll(data, hackyPasswordReplacement)
 		evt.Bytes(key+"_invalid", data)
 	}
 }
