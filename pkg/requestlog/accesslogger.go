@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -82,6 +83,10 @@ func AccessLogger(logOptions bool) func(http.Handler) http.Handler {
 				remoteAddr := r.RemoteAddr
 
 				requestLog.Str("remote_addr", remoteAddr)
+				forwardedFor, _, _ := strings.Cut(r.Header.Get("X-Forwarded-For"), ",")
+				if forwardedFor = strings.TrimSpace(forwardedFor); forwardedFor != "" {
+					requestLog.Str("x_forwarded_for", forwardedFor)
+				}
 				requestLog.Str("method", r.Method)
 				requestLog.Str("proto", r.Proto)
 				requestLog.Int64("request_length", r.ContentLength)
